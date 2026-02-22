@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Predict Delivery Risk | Supply Chain AI</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --orange: #FF9900;
+      --dark: #131921;
+      --navy: #0F1923;
+      --card: #1A2535;
+      --border: #243045;
+      --text: #EAECF0;
+      --muted: #8892A4;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --radius: 14px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--dark);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Navbar */
+    nav {
+      position: fixed; top: 0; width: 100%; z-index: 100;
+      background: rgba(19,25,33,0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 1.05rem; font-weight: 700; color: var(--orange);
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 1rem; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none;
+      font-size: 0.88rem; font-weight: 500;
+      padding: 0.4rem 0.8rem; border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--orange); background: rgba(255,153,0,0.08); }
+
+    /* Main layout */
+    .page {
+      max-width: 1100px; margin: 0 auto;
+      padding: 5.5rem 1.5rem 3rem;
+    }
+    .page-header { margin-bottom: 2.5rem; text-align: center; }
+    .page-header h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .page-header h1 span { color: var(--orange); }
+    .page-header p { color: var(--muted); font-size: 0.95rem; }
+
+    /* Two-column form layout */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .form-col {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+    }
+    .form-col-title {
+      font-size: 0.78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--orange); margin-bottom: 1.25rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    .form-group { margin-bottom: 1.25rem; }
+    label {
+      display: block; font-size: 0.82rem; font-weight: 600;
+      color: var(--muted); margin-bottom: 0.45rem;
+    }
+    input[type="number"], input[type="text"], select {
+      width: 100%;
+      background: var(--dark);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255,153,0,0.12);
+    }
+    input.error, select.error { border-color: var(--red); }
+    .error-msg { color: var(--red); font-size: 0.75rem; margin-top: 0.3rem; display: none; }
+    .error-msg.show { display: block; }
+
+    /* Slider */
+    .slider-group { margin-bottom: 1.25rem; }
+    .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; }
+    .slider-header label { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+    .slider-val {
+      background: rgba(255,153,0,0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem; border-radius: 4px;
+      font-size: 0.82rem; font-weight: 700;
+    }
+    input[type="range"] {
+      width: 100%; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      accent-color: var(--orange);
+      padding: 0; border: none;
+    }
+
+    /* Submit area */
+    .submit-row {
+      display: flex; gap: 1rem; justify-content: center;
+      flex-wrap: wrap; margin: 1.5rem 0;
+    }
+    .btn-submit {
+      background: var(--orange); color: #000;
+      font-weight: 800; font-size: 1rem;
+      padding: 0.9rem 2.5rem; border-radius: 10px;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; gap: 0.6rem;
+      transition: all 0.2s;
+      min-width: 200px; justify-content: center;
+    }
+    .btn-submit:hover:not(:disabled) {
+      background: #ffb732; transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255,153,0,0.35);
+    }
+    .btn-submit:disabled {
+      opacity: 0.65; cursor: not-allowed; transform: none;
+    }
+    .btn-reset {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-size: 0.9rem; font-weight: 600;
+      padding: 0.9rem 1.75rem; border-radius: 10px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-reset:hover { border-color: var(--muted); color: var(--text); }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results Section ── */
+    #result-section {
+      display: none;
+      animation: slideUp 0.5s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .result-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--result-glow, rgba(34,197,94,0.04));
+      pointer-events: none;
+    }
+
+    .result-icon { font-size: 3.5rem; margin-bottom: 0.75rem; }
+    .result-label {
+      font-size: 2.2rem; font-weight: 900;
+      margin-bottom: 0.5rem;
+    }
+    .result-confidence { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+
+    /* Confidence Ring */
+    .ring-container {
+      display: flex; justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .ring-svg { transform: rotate(-90deg); }
+    .ring-track { fill: none; stroke: var(--border); stroke-width: 8; }
+    .ring-fill {
+      fill: none; stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 283;
+      stroke-dashoffset: 283;
+      transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1), stroke 0.4s;
+    }
+    .ring-text {
+      position: absolute;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      inset: 0;
+    }
+    .ring-pct {
+      font-size: 1.6rem; font-weight: 900;
+      line-height: 1;
+    }
+    .ring-sub { font-size: 0.7rem; color: var(--muted); font-weight: 500; }
+    .ring-wrapper { position: relative; width: 120px; height: 120px; }
+
+    /* Probability bars */
+    .prob-section { margin-top: 0.5rem; }
+    .prob-title { font-size: 0.8rem; color: var(--muted); font-weight: 600; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .prob-bar-group { display: flex; flex-direction: column; gap: 0.75rem; text-align: left; }
+    .prob-item { }
+    .prob-header { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.3rem; }
+    .prob-name { font-weight: 600; }
+    .prob-pct { color: var(--muted); }
+    .prob-bar-track {
+      height: 8px; background: var(--dark);
+      border-radius: 4px; overflow: hidden;
+    }
+    .prob-bar-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    /* Recommendation */
+    .recommendation {
+      margin-top: 2rem;
+      background: var(--dark);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--orange);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: 0.88rem; line-height: 1.6;
+      text-align: left;
+    }
+    .rec-title { font-size: 0.75rem; color: var(--orange); font-weight: 700; margin-bottom: 0.4rem; text-transform: uppercase; }
+
+    /* Error banner */
+    #error-banner {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red);
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">📦 Supply Chain AI</a>
+  <div class="nav-links">
+    <a href="/">← Dashboard</a>
+    <a href="/predict" style="color:var(--orange);">🔮 Predict</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>🔮 <span>Delivery Risk</span> Predictor</h1>
+    <p>Fill in the order details to get an AI-powered delay risk assessment</p>
+  </div>
+
+  <div id="error-banner"></div>
+
+  <!-- ── Form ── -->
+  <div class="form-grid">
+
+    <!-- LEFT: Order Details -->
+    <div class="form-col">
+      <div class="form-col-title">📦 Order Details</div>
+
+      <div class="form-group">
+        <label>Shipping Mode</label>
+        <select id="shipping_mode">
+          <option value="Standard Class">Standard Class</option>
+          <option value="Second Class">Second Class</option>
+          <option value="First Class">First Class</option>
+          <option value="Same Day">Same Day</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Days for Shipping (Actual)</label>
+        <input type="number" id="days_for_shipping_real" value="5" min="0" max="30"/>
+        <div class="error-msg" id="err-days-real">Please enter a valid number of days</div>
+      </div>
+
+      <div class="form-group">
+        <label>Days for Shipment (Scheduled)</label>
+        <input type="number" id="days_for_shipment_scheduled" value="4" min="0" max="30"/>
+        <div class="error-msg" id="err-days-sched">Please enter a valid number</div>
+      </div>
+
+      <div class="form-group">
+        <label>Order Item Quantity</label>
+        <input type="number" id="order_item_quantity" value="2" min="1" max="1000"/>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <label>Discount Rate</label>
+          <span class="slider-val" id="discount-display">0.05</span>
+        </div>
+        <input type="range" id="order_item_discount_rate" min="0" max="1" step="0.01" value="0.05"
+          oninput="document.getElementById('discount-display').textContent=parseFloat(this.value).toFixed(2)"/>
+      </div>
+
+      <div class="form-group">
+        <label>Product Price ($)</label>
+        <input type="number" id="order_item_product_price" value="99.99" min="0"/>
+      </div>
+
+      <div class="form-group">
+        <label>Sales per Customer ($)</label>
+        <input type="number" id="sales_per_customer" value="250.0" min="0"/>
+      </div>
+
+      <div class="form-group">
+        <label>Order Type</label>
+        <select id="order_type">
+          <option value="DEBIT">DEBIT</option>
+          <option value="TRANSFER">TRANSFER</option>
+          <option value="CASH">CASH</option>
+          <option value="PAYMENT">PAYMENT</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- RIGHT: Location & Context -->
+    <div class="form-col">
+      <div class="form-col-title">🌍 Location & Context</div>
+
+      <div class="form-group">
+        <label>Market</label>
+        <select id="market">
+          <option value="USCA">USCA</option>
+          <option value="Europe">Europe</option>
+          <option value="LATAM">LATAM</option>
+          <option value="Pacific Asia">Pacific Asia</option>
+          <option value="Africa">Africa</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Order Region</label>
+        <select id="order_region">
+          <option value="US Center">US Center</option>
+          <option value="US East">US East</option>
+          <option value="US South">US South</option>
+          <option value="US West">US West</option>
+          <option value="Western Europe">Western Europe</option>
+          <option value="Central America">Central America</option>
+          <option value="South America">South America</option>
+          <option value="Southeast Asia">Southeast Asia</option>
+          <option value="West Africa">West Africa</option>
+          <option value="Eastern Asia">Eastern Asia</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Customer Segment</label>
+        <select id="customer_segment">
+          <option value="Consumer">Consumer</option>
+          <option value="Corporate">Corporate</option>
+          <option value="Home Office">Home Office</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Department Name</label>
+        <select id="department_name">
+          <option value="Fan Shop">Fan Shop</option>
+          <option value="Apparel">Apparel</option>
+          <option value="Golf">Golf</option>
+          <option value="Footwear">Footwear</option>
+          <option value="Outdoors">Outdoors</option>
+          <option value="Fitness">Fitness</option>
+          <option value="Technology">Technology</option>
+          <option value="Book Shop">Book Shop</option>
+          <option value="Pet Shop">Pet Shop</option>
+          <option value="Discs Shop">Discs Shop</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Category Name</label>
+        <input type="text" id="category_name" value="Sporting Goods" list="cat-list"/>
+        <datalist id="cat-list">
+          <option value="Sporting Goods"/>
+          <option value="Cleats"/>
+          <option value="Men's Footwear"/>
+          <option value="Women's Apparel"/>
+          <option value="Electronics"/>
+          <option value="Fishing"/>
+          <option value="Camping & Hiking"/>
+          <option value="Books"/>
+          <option value="Pet Supplies"/>
+        </datalist>
+      </div>
+
+      <div class="form-group">
+        <label>Order Status</label>
+        <select id="order_status">
+          <option value="COMPLETE">COMPLETE</option>
+          <option value="PENDING">PENDING</option>
+          <option value="PROCESSING">PROCESSING</option>
+          <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
+          <option value="CLOSED">CLOSED</option>
+          <option value="ON_HOLD">ON_HOLD</option>
+          <option value="CANCELED">CANCELED</option>
+          <option value="SUSPECTED_FRAUD">SUSPECTED_FRAUD</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Late Delivery Risk Flag</label>
+        <select id="late_delivery_risk">
+          <option value="0">0 — No risk flagged</option>
+          <option value="1">1 — Risk flagged</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Order Profit per Order ($)</label>
+        <input type="number" id="order_profit_per_order" value="25.0"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <div class="submit-row">
+    <button class="btn-submit" id="submit-btn" onclick="submitPrediction()">
+      <span id="btn-text">🔮 Predict Risk</span>
+      <div class="spinner" id="btn-spinner"></div>
+    </button>
+    <button class="btn-reset" onclick="resetForm()">↺ Reset</button>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="result-section">
+    <div class="result-card" id="result-card">
+      <div class="result-icon" id="result-icon">🟢</div>
+      <div class="result-label" id="result-label">On-Time</div>
+      <div class="result-confidence" id="result-confidence">Confidence: —%</div>
+
+      <div class="ring-container">
+        <div class="ring-wrapper">
+          <svg class="ring-svg" width="120" height="120" viewBox="0 0 100 100">
+            <circle class="ring-track" cx="50" cy="50" r="45"/>
+            <circle class="ring-fill" id="ring-fill" cx="50" cy="50" r="45"/>
+          </svg>
+          <div class="ring-text">
+            <div class="ring-pct" id="ring-pct">0%</div>
+            <div class="ring-sub">confidence</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prob-section">
+        <div class="prob-title">Class Probability Breakdown</div>
+        <div class="prob-bar-group">
+          <div class="prob-item">
+            <div class="prob-header">
+              <span class="prob-name" style="color:var(--green)">✅ On-Time</span>
+              <span class="prob-pct" id="prob-ontime">0%</span>
+            </div>
+            <div class="prob-bar-track">
+              <div class="prob-bar-fill" id="bar-ontime" style="background:var(--green)"></div>
+            </div>
+          </div>
+          <div class="prob-item">
+            <div class="prob-header">
+              <span class="prob-name" style="color:var(--yellow)">⚠️ At Risk</span>
+              <span class="prob-pct" id="prob-atrisk">0%</span>
+            </div>
+            <div class="prob-bar-track">
+              <div class="prob-bar-fill" id="bar-atrisk" style="background:var(--yellow)"></div>
+            </div>
+          </div>
+          <div class="prob-item">
+            <div class="prob-header">
+              <span class="prob-name" style="color:var(--red)">🚨 Delayed</span>
+              <span class="prob-pct" id="prob-delayed">0%</span>
+            </div>
+            <div class="prob-bar-track">
+              <div class="prob-bar-fill" id="bar-delayed" style="background:var(--red)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <div class="rec-title">💡 Recommendation</div>
+        <div id="rec-text"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function submitPrediction() {
+    // Validate
+    let valid = true;
+    const daysReal = parseFloat(document.getElementById('days_for_shipping_real').value);
+    const daysSched = parseFloat(document.getElementById('days_for_shipment_scheduled').value);
+
+    if (isNaN(daysReal) || daysReal < 0) {
+      document.getElementById('err-days-real').classList.add('show');
+      document.getElementById('days_for_shipping_real').classList.add('error');
+      valid = false;
+    } else {
+      document.getElementById('err-days-real').classList.remove('show');
+      document.getElementById('days_for_shipping_real').classList.remove('error');
+    }
+
+    if (isNaN(daysSched) || daysSched < 0) {
+      document.getElementById('err-days-sched').classList.add('show');
+      document.getElementById('days_for_shipment_scheduled').classList.add('error');
+      valid = false;
+    } else {
+      document.getElementById('err-days-sched').classList.remove('show');
+      document.getElementById('days_for_shipment_scheduled').classList.remove('error');
+    }
+
+    if (!valid) return;
+
+    // Show loading
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    document.getElementById('btn-text').textContent = 'Predicting...';
+    document.getElementById('btn-spinner').style.display = 'block';
+    document.getElementById('error-banner').style.display = 'none';
+    document.getElementById('result-section').style.display = 'none';
+
+    const payload = {
+      shipping_mode: document.getElementById('shipping_mode').value,
+      days_for_shipping_real: daysReal,
+      days_for_shipment_scheduled: daysSched,
+      order_item_quantity: parseInt(document.getElementById('order_item_quantity').value) || 1,
+      order_item_discount_rate: parseFloat(document.getElementById('order_item_discount_rate').value),
+      order_item_product_price: parseFloat(document.getElementById('order_item_product_price').value) || 100,
+      sales_per_customer: parseFloat(document.getElementById('sales_per_customer').value) || 100,
+      market: document.getElementById('market').value,
+      order_region: document.getElementById('order_region').value,
+      customer_segment: document.getElementById('customer_segment').value,
+      department_name: document.getElementById('department_name').value,
+      category_name: document.getElementById('category_name').value,
+      order_status: document.getElementById('order_status').value,
+      order_type: document.getElementById('order_type').value,
+      late_delivery_risk: parseInt(document.getElementById('late_delivery_risk').value),
+      order_profit_per_order: parseFloat(document.getElementById('order_profit_per_order').value) || 0,
+      order_item_discount: parseFloat(document.getElementById('order_item_discount_rate').value) * parseFloat(document.getElementById('order_item_product_price').value || 100),
+      sales: parseFloat(document.getElementById('sales_per_customer').value) || 100,
+      order_item_total: parseFloat(document.getElementById('order_item_product_price').value || 100),
+      order_item_profit_ratio: 0.2,
+      product_price: parseFloat(document.getElementById('order_item_product_price').value) || 100,
+      product_status: 0,
+      benefit_per_order: parseFloat(document.getElementById('order_profit_per_order').value) || 0,
+      latitude: 40.0,
+      longitude: -74.0,
+    };
+
+    try {
+      const res = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Prediction failed');
+      }
+
+      showResult(data.result);
+
+    } catch (err) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = '⚠️ ' + err.message;
+      banner.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      document.getElementById('btn-text').textContent = '🔮 Predict Risk';
+      document.getElementById('btn-spinner').style.display = 'none';
+    }
+  }
+
+  function showResult(r) {
+    const section = document.getElementById('result-section');
+    const card = document.getElementById('result-card');
+
+    // Color themes
+    const colorMap = {
+      'On-Time': { bg: 'rgba(34,197,94,0.04)', border: 'rgba(34,197,94,0.3)', ring: '#22c55e' },
+      'At Risk':  { bg: 'rgba(245,158,11,0.04)', border: 'rgba(245,158,11,0.3)', ring: '#f59e0b' },
+      'Delayed':  { bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.3)', ring: '#ef4444' },
+    };
+    const theme = colorMap[r.prediction] || colorMap['On-Time'];
+
+    card.style.setProperty('--result-glow', theme.bg);
+    card.style.borderColor = theme.border;
+
+    document.getElementById('result-icon').textContent = r.icon;
+    document.getElementById('result-label').textContent = r.prediction;
+    document.getElementById('result-label').style.color = r.color;
+    document.getElementById('result-confidence').textContent =
+      `Confidence: ${r.confidence}%`;
+
+    // Animate confidence ring
+    const circumference = 2 * Math.PI * 45;
+    const fill = document.getElementById('ring-fill');
+    fill.style.stroke = theme.ring;
+    const offset = circumference * (1 - r.confidence / 100);
+    setTimeout(() => {
+      fill.style.strokeDashoffset = offset;
+    }, 100);
+    animateNum('ring-pct', r.confidence, 1, '%');
+
+    // Probability bars
+    const probs = r.probabilities;
+    animateBar('bar-ontime', 'prob-ontime', probs['On-Time']);
+    animateBar('bar-atrisk', 'prob-atrisk', probs['At Risk']);
+    animateBar('bar-delayed', 'prob-delayed', probs['Delayed']);
+
+    document.getElementById('rec-text').textContent = r.recommendation;
+
+    section.style.display = 'block';
+    setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
+
+  function animateBar(barId, pctId, value) {
+    const bar = document.getElementById(barId);
+    const pct = document.getElementById(pctId);
+    pct.textContent = value.toFixed(1) + '%';
+    setTimeout(() => { bar.style.width = value + '%'; }, 100);
+  }
+
+  function animateNum(id, target, decimals, suffix) {
+    const el = document.getElementById(id);
+    let start = 0;
+    const step = target / 40;
+    const t = setInterval(() => {
+      start = Math.min(start + step, target);
+      el.textContent = start.toFixed(decimals) + suffix;
+      if (start >= target) clearInterval(t);
+    }, 25);
+  }
+
+  function resetForm() {
+    document.getElementById('result-section').style.display = 'none';
+    document.getElementById('error-banner').style.display = 'none';
+    document.querySelectorAll('.error-msg').forEach(e => e.classList.remove('show'));
+    document.querySelectorAll('input.error, select.error').forEach(e => e.classList.remove('error'));
+    document.getElementById('ring-fill').style.strokeDashoffset = 283;
+    document.getElementById('bar-ontime').style.width = '0%';
+    document.getElementById('bar-atrisk').style.width = '0%';
+    document.getElementById('bar-delayed').style.width = '0%';
+  }
+</script>
+</body>
+</html>

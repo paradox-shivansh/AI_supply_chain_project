@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Amazon Supply Chain Intelligence | AI-Powered Delivery Predictor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --amazon-orange: #FF9900;
+      --amazon-dark: #131921;
+      --amazon-navy: #0F1923;
+      --amazon-blue: #146EB4;
+      --card-bg: #1A2535;
+      --card-border: #243045;
+      --text-primary: #EAECF0;
+      --text-muted: #8892A4;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --radius: 14px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--amazon-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Navbar ── */
+    nav {
+      position: fixed; top: 0; width: 100%; z-index: 100;
+      background: rgba(19,25,33,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 1.1rem; font-weight: 700; color: var(--amazon-orange);
+      text-decoration: none;
+    }
+    .nav-logo .logo-icon { font-size: 1.5rem; }
+    .nav-links { display: flex; gap: 1.5rem; }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none;
+      font-size: 0.9rem; font-weight: 500;
+      transition: color 0.2s;
+      padding: 0.5rem 0.75rem; border-radius: 6px;
+    }
+    .nav-links a:hover { color: var(--amazon-orange); background: rgba(255,153,0,0.08); }
+    .btn-predict-nav {
+      background: var(--amazon-orange) !important;
+      color: #000 !important; font-weight: 700 !important;
+      padding: 0.5rem 1.25rem !important; border-radius: 8px !important;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      position: relative; overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255,153,0,0.15) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(20,110,180,0.1) 0%, transparent 50%);
+    }
+    /* Animated grid */
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,153,0,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,153,0,0.05) 1px, transparent 1px);
+      background-size: 60px 60px;
+      animation: gridMove 20s linear infinite;
+      opacity: 0.4;
+    }
+    @keyframes gridMove {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(60px); }
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(255,153,0,0.12);
+      border: 1px solid rgba(255,153,0,0.3);
+      color: var(--amazon-orange);
+      padding: 0.4rem 1rem; border-radius: 50px;
+      font-size: 0.8rem; font-weight: 600;
+      margin-bottom: 1.5rem;
+      position: relative; z-index: 1;
+      animation: fadeInDown 0.6s ease;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; background: var(--amazon-orange);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800; line-height: 1.15;
+      margin-bottom: 1.25rem;
+      position: relative; z-index: 1;
+      animation: fadeInDown 0.7s ease 0.1s both;
+    }
+    h1 span { color: var(--amazon-orange); }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-muted); max-width: 600px;
+      line-height: 1.7; margin-bottom: 2.5rem;
+      position: relative; z-index: 1;
+      animation: fadeInDown 0.7s ease 0.2s both;
+    }
+
+    .hero-actions {
+      display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+      position: relative; z-index: 1;
+      animation: fadeInDown 0.7s ease 0.3s both;
+    }
+    .btn-primary {
+      background: var(--amazon-orange); color: #000;
+      font-weight: 700; font-size: 1rem;
+      padding: 0.9rem 2rem; border-radius: 10px;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-primary:hover {
+      background: #ffb732; transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255,153,0,0.3);
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-primary); font-weight: 600; font-size: 1rem;
+      padding: 0.9rem 2rem; border-radius: 10px;
+      text-decoration: none; cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-outline:hover {
+      border-color: var(--amazon-orange); color: var(--amazon-orange);
+      background: rgba(255,153,0,0.05);
+    }
+
+    /* ── Stat Cards ── */
+    .stats-strip {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem; max-width: 900px; width: 100%;
+      margin: 3.5rem auto 0; position: relative; z-index: 1;
+      padding: 0 1rem;
+      animation: fadeInUp 0.8s ease 0.4s both;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.25rem;
+      text-align: center;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .stat-card:hover {
+      border-color: rgba(255,153,0,0.4);
+      transform: translateY(-3px);
+    }
+    .stat-icon { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    .stat-value {
+      font-size: 2rem; font-weight: 800;
+      color: var(--amazon-orange); line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+
+    /* ── Sections ── */
+    section { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
+
+    .section-tag {
+      display: inline-block;
+      background: rgba(255,153,0,0.1);
+      color: var(--amazon-orange);
+      padding: 0.3rem 0.8rem; border-radius: 4px;
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; margin-bottom: 1rem;
+    }
+    h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800; margin-bottom: 0.75rem;
+    }
+    .section-desc { color: var(--text-muted); font-size: 1rem; max-width: 550px; line-height: 1.7; }
+
+    /* ── How it works ── */
+    .steps-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 2rem 1.75rem;
+      position: relative; overflow: hidden;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .step-card:hover {
+      border-color: rgba(255,153,0,0.4);
+      transform: translateY(-4px);
+    }
+    .step-num {
+      font-size: 4rem; font-weight: 900;
+      color: rgba(255,153,0,0.08);
+      position: absolute; top: 0.5rem; right: 1rem;
+      line-height: 1;
+    }
+    .step-icon {
+      font-size: 2rem; margin-bottom: 1rem;
+      width: 52px; height: 52px;
+      background: rgba(255,153,0,0.1);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.6rem; }
+    .step-desc { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+
+    /* ── Dashboard Section ── */
+    .dashboard-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1.5rem; margin-top: 2.5rem;
+    }
+    @media (max-width: 700px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+    .chart-card h3 { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1rem; font-weight: 600; }
+    .chart-card canvas { max-height: 240px; }
+
+    .metrics-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1rem; margin-top: 1.5rem;
+    }
+    .metric-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px; padding: 1.25rem;
+      display: flex; flex-direction: column; gap: 0.25rem;
+    }
+    .metric-name { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+    .metric-val { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); }
+    .metric-val span { font-size: 0.9rem; color: var(--text-muted); font-weight: 400; }
+
+    /* ── Model Compare Table ── */
+    .model-table-wrapper { margin-top: 2rem; overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse;
+      background: var(--card-bg); border-radius: var(--radius); overflow: hidden;
+    }
+    th {
+      background: var(--amazon-dark);
+      color: var(--text-muted); font-size: 0.78rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 0.9rem 1.25rem; text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 0.85rem 1.25rem; font-size: 0.9rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,153,0,0.03); }
+    .badge-best {
+      background: rgba(255,153,0,0.15);
+      color: var(--amazon-orange);
+      border: 1px solid rgba(255,153,0,0.3);
+      padding: 0.2rem 0.6rem; border-radius: 20px;
+      font-size: 0.72rem; font-weight: 700; margin-left: 0.5rem;
+    }
+
+    /* ── Tech Stack ── */
+    .tech-stack { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+    .tech-badge {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 8px; padding: 0.5rem 1rem;
+      font-size: 0.82rem; font-weight: 600; color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .tech-badge:hover { border-color: var(--amazon-orange); color: var(--amazon-orange); }
+
+    /* ── CTA Section ── */
+    .cta-section {
+      text-align: center; padding: 6rem 2rem;
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,153,0,0.07) 0%, transparent 70%);
+      border-top: 1px solid var(--card-border);
+      border-bottom: 1px solid var(--card-border);
+    }
+    .cta-section h2 { font-size: 2rem; margin-bottom: 1rem; }
+    .cta-section p { color: var(--text-muted); margin-bottom: 2rem; font-size: 1rem; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center; padding: 2rem;
+      color: var(--text-muted); font-size: 0.83rem;
+      border-top: 1px solid var(--card-border);
+    }
+    footer a { color: var(--amazon-orange); text-decoration: none; }
+
+    /* ── Animations ── */
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .loading-state { color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 2rem; }
+    .no-data { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.5rem; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<nav>
+  <a href="/" class="nav-logo">
+    <span class="logo-icon">📦</span>
+    Supply Chain AI
+  </a>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/predict" class="btn-predict-nav">🔮 Predict Risk</a>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero" style="max-width:100%;padding-top:5rem;">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+
+  <div class="hero-badge">
+    <div class="pulse-dot"></div>
+    AI-Powered · Multi-Class Classification · GNN Enhanced
+  </div>
+
+  <h1>Amazon <span>Supply Chain</span><br>Intelligence</h1>
+  <p class="hero-sub">
+    Predict delivery delay risk — <em>On-Time</em>, <em>At Risk</em>, or <em>Delayed</em> —
+    using advanced machine learning with Graph Neural Networks across 52,000+ orders.
+  </p>
+
+  <div class="hero-actions">
+    <a href="/predict" class="btn-primary">🔮 Predict an Order</a>
+    <a href="#dashboard" class="btn-outline">📊 View Metrics</a>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-icon">🧠</div>
+      <div class="stat-value" id="stat-accuracy">—</div>
+      <div class="stat-label">Best Accuracy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🎯</div>
+      <div class="stat-value" id="stat-f1">—</div>
+      <div class="stat-label">Weighted F1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🤖</div>
+      <div class="stat-value" id="stat-model">—</div>
+      <div class="stat-label">Best Model</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📈</div>
+      <div class="stat-value" id="stat-kappa">—</div>
+      <div class="stat-label">Cohen's Kappa</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it Works ── -->
+<section>
+  <div class="section-tag">HOW IT WORKS</div>
+  <h2>End-to-End ML Pipeline</h2>
+  <p class="section-desc">From raw order data to actionable delay predictions in seconds.</p>
+
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">01</div>
+      <div class="step-icon">📥</div>
+      <div class="step-title">Data Ingestion</div>
+      <div class="step-desc">Load and clean e-commerce order data. Drop PII fields, remove duplicates, and engineer the 3-class target variable.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">02</div>
+      <div class="step-icon">⚙️</div>
+      <div class="step-title">Feature Engineering</div>
+      <div class="step-desc">Create temporal features, market risk scores, region delay rates, shipping mode encoding, and discount impact metrics.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">03</div>
+      <div class="step-icon">⚖️</div>
+      <div class="step-title">Class Balancing</div>
+      <div class="step-desc">Apply SMOTE (Synthetic Minority Oversampling) to handle class imbalance, ensuring all three delay classes are well represented.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">04</div>
+      <div class="step-icon">🌐</div>
+      <div class="step-title">GNN + ML Models</div>
+      <div class="step-desc">Train CatBoost, XGBoost, LightGBM, Random Forest, and a Graph Neural Network that captures order-to-order relationships.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">05</div>
+      <div class="step-icon">🏆</div>
+      <div class="step-title">Model Selection</div>
+      <div class="step-desc">Evaluate all models on Weighted F1, Macro F1, Cohen's Kappa, and ROC-AUC. Automatically select and serialize the best performer.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">06</div>
+      <div class="step-icon">🔮</div>
+      <div class="step-title">Real-Time Prediction</div>
+      <div class="step-desc">Submit order details via the form. Get instant risk classification with confidence scores and actionable recommendations.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Dashboard ── -->
+<section id="dashboard">
+  <div class="section-tag">LIVE DASHBOARD</div>
+  <h2>Model Performance</h2>
+  <p class="section-desc">Real-time metrics from the last training run.</p>
+
+  <div class="metrics-grid" id="metrics-grid">
+    <div class="loading-state" style="grid-column:1/-1;">Loading metrics...</div>
+  </div>
+
+  <div class="dashboard-grid" style="margin-top:2rem;">
+    <div class="chart-card">
+      <h3>📊 Model Comparison — Weighted F1</h3>
+      <canvas id="modelCompareChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>🔍 Top Feature Importance</h3>
+      <canvas id="featureChart"></canvas>
+    </div>
+  </div>
+
+  <div class="model-table-wrapper">
+    <div id="model-table-container">
+      <div class="loading-state">Loading model comparison...</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Tech Stack ── -->
+<section style="padding-top:0;">
+  <div class="section-tag">TECH STACK</div>
+  <h2>Built With</h2>
+  <div class="tech-stack">
+    <div class="tech-badge">🐍 Python 3.10</div>
+    <div class="tech-badge">🌶 Flask</div>
+    <div class="tech-badge">🌐 PyTorch Geometric (GNN)</div>
+    <div class="tech-badge">🐱 CatBoost</div>
+    <div class="tech-badge">⚡ XGBoost</div>
+    <div class="tech-badge">💡 LightGBM</div>
+    <div class="tech-badge">🌲 Random Forest</div>
+    <div class="tech-badge">📊 SMOTE / ADASYN</div>
+    <div class="tech-badge">🔧 Scikit-learn</div>
+    <div class="tech-badge">🐼 Pandas + NumPy</div>
+    <div class="tech-badge">📈 Chart.js</div>
+  </div>
+</section>
+
+<!-- ── CTA ── -->
+<div class="cta-section">
+  <h2>Ready to predict delivery risk?</h2>
+  <p>Enter your order details and get an instant AI-powered delay risk assessment.</p>
+  <a href="/predict" class="btn-primary" style="font-size:1.1rem; padding:1rem 2.5rem;">
+    🚀 Start Predicting
+  </a>
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  <p>Amazon Supply Chain Intelligence &copy; 2025 &nbsp;|&nbsp; Built with Python 3.10, Flask, PyTorch Geometric &nbsp;|&nbsp;
+    <a href="/health">API Health</a> &nbsp;|&nbsp;
+    <a href="/metrics">Metrics JSON</a>
+  </p>
+</footer>
+
+<script>
+  // ── Load metrics and populate dashboard ──
+  let modelCompareChart, featureChart;
+
+  async function loadMetrics() {
+    try {
+      const res = await fetch('/metrics');
+      if (!res.ok) {
+        document.getElementById('metrics-grid').innerHTML =
+          '<div class="no-data">⚠️ No metrics yet. <a href="/predict" style="color:var(--amazon-orange)">Train the model</a> to see stats.</div>';
+        return;
+      }
+      const data = await res.json();
+
+      // Populate stat cards
+      const best = data.best_model_full_report || {};
+      animateCounter('stat-accuracy', (best.accuracy || 0) * 100, '%', 1);
+      animateCounter('stat-f1', (best.weighted_f1 || 0) * 100, '%', 1);
+      document.getElementById('stat-model').textContent = (data.best_model || '—').split(' ')[0];
+      animateCounter('stat-kappa', best.cohen_kappa || 0, '', 2);
+
+      // Metrics grid
+      const mg = document.getElementById('metrics-grid');
+      mg.innerHTML = `
+        <div class="metric-item">
+          <div class="metric-name">Accuracy</div>
+          <div class="metric-val">${((best.accuracy||0)*100).toFixed(1)}<span>%</span></div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-name">Weighted F1</div>
+          <div class="metric-val">${((best.weighted_f1||0)*100).toFixed(1)}<span>%</span></div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-name">Macro F1</div>
+          <div class="metric-val">${((best.macro_f1||0)*100).toFixed(1)}<span>%</span></div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-name">Cohen's Kappa</div>
+          <div class="metric-val">${(best.cohen_kappa||0).toFixed(3)}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-name">ROC-AUC</div>
+          <div class="metric-val">${best.roc_auc_weighted ? ((best.roc_auc_weighted)*100).toFixed(1)+'<span>%</span>' : '—'}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-name">Best Model</div>
+          <div class="metric-val" style="font-size:1rem;">${data.best_model || '—'}</div>
+        </div>
+      `;
+
+      // Model comparison chart
+      const comparison = data.model_comparison || {};
+      const modelNames = Object.keys(comparison);
+      const f1Scores = modelNames.map(n => ((comparison[n].weighted_f1||0)*100).toFixed(1));
+      const colors = modelNames.map((n, i) =>
+        n === data.best_model
+          ? 'rgba(255,153,0,0.9)'
+          : `rgba(20,110,180,${0.5 + i * 0.1})`
+      );
+
+      if (modelCompareChart) modelCompareChart.destroy();
+      const ctx1 = document.getElementById('modelCompareChart').getContext('2d');
+      modelCompareChart = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: modelNames,
+          datasets: [{
+            label: 'Weighted F1 (%)',
+            data: f1Scores,
+            backgroundColor: colors,
+            borderRadius: 6,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.raw}%` } }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              min: Math.max(0, Math.min(...f1Scores) - 5),
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#8892A4', callback: v => v + '%' }
+            },
+            x: { grid: { display: false }, ticks: { color: '#8892A4' } }
+          }
+        }
+      });
+
+      // Model comparison table
+      const tableContainer = document.getElementById('model-table-container');
+      let tableHTML = `
+        <table style="margin-top:1.5rem;">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Accuracy</th>
+              <th>Weighted F1</th>
+              <th>Macro F1</th>
+              <th>Cohen's κ</th>
+              <th>ROC-AUC</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      for (const [name, m] of Object.entries(comparison)) {
+        const isBest = name === data.best_model;
+        tableHTML += `
+          <tr>
+            <td>
+              ${name}
+              ${isBest ? '<span class="badge-best">★ BEST</span>' : ''}
+            </td>
+            <td>${((m.accuracy||0)*100).toFixed(2)}%</td>
+            <td>${((m.weighted_f1||0)*100).toFixed(2)}%</td>
+            <td>${((m.macro_f1||0)*100).toFixed(2)}%</td>
+            <td>${(m.cohen_kappa||0).toFixed(3)}</td>
+            <td>${m.roc_auc_weighted ? ((m.roc_auc_weighted)*100).toFixed(2)+'%' : '—'}</td>
+          </tr>
+        `;
+      }
+      tableHTML += '</tbody></table>';
+      tableContainer.innerHTML = tableHTML;
+
+    } catch (e) {
+      console.error('Metrics load error:', e);
+    }
+  }
+
+  async function loadFeatureImportance() {
+    try {
+      const res = await fetch('/api/features');
+      if (!res.ok) return;
+      const data = await res.json();
+      const features = data.features || {};
+      const labels = Object.keys(features).slice(0, 12);
+      const values = labels.map(k => features[k]);
+
+      if (featureChart) featureChart.destroy();
+      const ctx2 = document.getElementById('featureChart').getContext('2d');
+      featureChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: labels.map(l => l.length > 20 ? l.slice(0, 20) + '…' : l),
+          datasets: [{
+            label: 'Importance',
+            data: values,
+            backgroundColor: 'rgba(255,153,0,0.75)',
+            borderRadius: 4,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892A4' } },
+            y: { grid: { display: false }, ticks: { color: '#8892A4', font: { size: 10 } } }
+          }
+        }
+      });
+    } catch (e) {
+      document.getElementById('featureChart').parentElement.innerHTML +=
+        '<p class="no-data">Feature importance not available</p>';
+    }
+  }
+
+  function animateCounter(id, target, suffix, decimals) {
+    const el = document.getElementById(id);
+    if (!el || !target) return;
+    let start = 0;
+    const step = target / 40;
+    const timer = setInterval(() => {
+      start = Math.min(start + step, target);
+      el.textContent = start.toFixed(decimals) + suffix;
+      if (start >= target) clearInterval(timer);
+    }, 30);
+  }
+
+  // Init
+  loadMetrics();
+  loadFeatureImportance();
+</script>
+</body>
+</html>
