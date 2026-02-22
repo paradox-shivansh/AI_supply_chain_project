@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from logger import logger
 from exception import CustomException
-from utils import load_object
+from utils import load_json, load_object
 
 
 # Label mapping
@@ -50,12 +50,15 @@ class PredictPipeline:
         self.market_risk_path = os.path.join("artifacts", "market_risk_map.pkl")
         self.region_delay_path = os.path.join("artifacts", "region_delay_map.pkl")
         self.customer_freq_path = os.path.join("artifacts", "customer_freq_map.pkl")
+        self.label_mapping_path = os.path.join("artifacts", "label_mapping.json")
 
         self._preprocessor = None
         self._model = None
         self._market_risk_map = {}
         self._region_delay_map = {}
         self._customer_freq_map = {}
+        self._label_mapping = {0: 0, 1: 1, 2: 2}
+        self._inverse_label_mapping = {0: 0, 1: 1, 2: 2}
 
     def _load_artifacts(self):
         """Lazy-load all artifacts."""
@@ -70,6 +73,20 @@ class PredictPipeline:
                 self._region_delay_map = load_object(self.region_delay_path)
             if os.path.exists(self.customer_freq_path):
                 self._customer_freq_map = load_object(self.customer_freq_path)
+            if os.path.exists(self.label_mapping_path):
+                mapping_payload = load_json(self.label_mapping_path)
+                self._label_mapping = {
+                    int(k): int(v) for k, v in mapping_payload.get("label_mapping", {}).items()
+                } or self._label_mapping
+                self._inverse_label_mapping = {
+                    int(k): int(v) for k, v in mapping_payload.get("inverse_label_mapping", {}).items()
+                } or self._inverse_label_mapping
+
+    def _decode_label(self, encoded_label: int) -> int:
+        return self._inverse_label_mapping.get(int(encoded_label), int(encoded_label))
+
+    def _encoded_index(self, original_label: int) -> int:
+        return self._label_mapping.get(int(original_label), None)
 
     def _apply_feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         """Apply the same feature engineering as training."""
@@ -136,30 +153,43 @@ class PredictPipeline:
             X_transformed = self._preprocessor.transform(df)
 
             # Predict class
-            pred_class = int(self._model.predict(X_transformed)[0])
-            pred_label = LABEL_MAP[pred_class]
+            encoded_pred = int(self._model.predict(X_transformed)[0])
+            decoded_pred = self._decode_label(encoded_pred)
+            pred_label = LABEL_MAP.get(decoded_pred, f"Class {decoded_pred}")
 
             # Predict probabilities
+            num_encoded_classes = len(self._inverse_label_mapping)
             if hasattr(self._model, "predict_proba"):
-                proba = self._model.predict_proba(X_transformed)[0]
+                encoded_proba = self._model.predict_proba(X_transformed)[0]
+                if encoded_proba.shape[0] < num_encoded_classes:
+                    pad_width = num_encoded_classes - encoded_proba.shape[0]
+                    encoded_proba = np.pad(encoded_proba, (0, pad_width), constant_values=0.0)
             else:
-                proba = np.zeros(3)
-                proba[pred_class] = 1.0
+                encoded_proba = np.zeros(num_encoded_classes, dtype=float)
+            confidence = float(
+                encoded_proba[encoded_pred] if encoded_pred < len(encoded_proba) else 0.0
+            )
 
-            confidence = float(proba[pred_class])
+            probabilities = {}
+            for cls_code, label_name in LABEL_MAP.items():
+                encoded_idx = self._encoded_index(cls_code)
+                if encoded_idx is not None and encoded_idx < len(encoded_proba):
+                    prob = encoded_proba[encoded_idx]
+                else:
+                    prob = 0.0
+                probabilities[label_name] = round(float(prob) * 100, 2)
 
             result = {
                 "prediction": pred_label,
-                "prediction_code": pred_class,
+                "prediction_code": decoded_pred,
                 "confidence": round(confidence * 100, 2),
-                "probabilities": {
-                    "On-Time": round(float(proba[0]) * 100, 2),
-                    "At Risk": round(float(proba[1]) * 100, 2),
-                    "Delayed": round(float(proba[2]) * 100, 2),
-                },
-                "color": LABEL_COLORS[pred_class],
-                "icon": LABEL_ICONS[pred_class],
-                "recommendation": RECOMMENDATIONS[pred_class],
+                "probabilities": probabilities,
+                "color": LABEL_COLORS.get(decoded_pred, "#6b7280"),
+                "icon": LABEL_ICONS.get(decoded_pred, "ℹ️"),
+                "recommendation": RECOMMENDATIONS.get(
+                    decoded_pred,
+                    "Prediction returned an out-of-distribution class. Inspect the model outputs.",
+                ),
             }
 
             logger.info(

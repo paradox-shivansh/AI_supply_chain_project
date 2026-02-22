@@ -1,0 +1,10 @@
+{
+    "label_mapping": {
+        "0": 0,
+        "2": 1
+    },
+    "inverse_label_mapping": {
+        "0": 0,
+        "1": 2
+    }
+}

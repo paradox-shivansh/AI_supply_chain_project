@@ -287,6 +287,7 @@ class ModelTrainerConfig:
     trained_model_file_path: str = os.path.join("artifacts", "model.pkl")
     metrics_file_path: str = os.path.join("artifacts", "metrics.json")
     best_model_name_path: str = os.path.join("artifacts", "best_model_name.txt")
+    label_mapping_path: str = os.path.join("artifacts", "label_mapping.json")
 
 
 class ModelTrainer:
@@ -299,6 +300,8 @@ class ModelTrainer:
 
     def __init__(self):
         self.model_trainer_config = ModelTrainerConfig()
+        self.label_mapping: Dict[int, int] = {}
+        self.inverse_label_mapping: Dict[int, int] = {}
 
     def _build_models(self) -> Dict:
         models = {}
@@ -373,24 +376,68 @@ class ModelTrainer:
 
         return params
 
+    def _encode_labels(self, y_train: np.ndarray, y_test: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Re-map label values to a contiguous range [0, n_classes-1] so that
+        estimators like XGBoost can handle datasets with missing intermediate labels.
+        """
+        combined = np.concatenate([y_train, y_test])
+        unique_labels = np.unique(combined)
+        self.label_mapping = {original: idx for idx, original in enumerate(unique_labels)}
+        self.inverse_label_mapping = {idx: original for original, idx in self.label_mapping.items()}
+
+        y_train_encoded = np.array([self.label_mapping[int(label)] for label in y_train], dtype=int)
+        y_test_encoded = np.array([self.label_mapping[int(label)] for label in y_test], dtype=int)
+        self._save_label_mapping()
+        return y_train_encoded, y_test_encoded
+
+    def _save_label_mapping(self):
+        """Persist the label encoding maps so inference can decode back."""
+        mapping_payload = {
+            "label_mapping": {str(k): int(v) for k, v in self.label_mapping.items()},
+            "inverse_label_mapping": {str(k): int(v) for k, v in self.inverse_label_mapping.items()},
+        }
+        save_json(
+            self.model_trainer_config.label_mapping_path,
+            mapping_payload,
+        )
+
+    def _decode_labels(self, labels: np.ndarray) -> np.ndarray:
+        """
+        Map contiguous encoded labels back to their original values.
+        """
+        inverse = self.inverse_label_mapping
+        return np.array([inverse.get(int(label), int(label)) for label in labels], dtype=int)
+
     def _compute_full_metrics(
         self, model: Any, X_test: np.ndarray, y_test: np.ndarray, model_name: str
     ) -> Dict:
         """Compute comprehensive evaluation metrics."""
-        y_pred = model.predict(X_test)
+        y_pred_encoded = model.predict(X_test)
+        y_test_decoded = self._decode_labels(y_test)
+        y_pred_decoded = self._decode_labels(y_pred_encoded)
+
+        present_classes = np.unique(y_test_decoded)
+        target_names = [
+            self.CLASS_NAMES.get(cls, f"Class {cls}") for cls in present_classes
+        ]
 
         metrics = {
             "model_name": model_name,
-            "accuracy": float(accuracy_score(y_test, y_pred)),
-            "weighted_f1": float(f1_score(y_test, y_pred, average="weighted")),
-            "macro_f1": float(f1_score(y_test, y_pred, average="macro")),
-            "cohen_kappa": float(cohen_kappa_score(y_test, y_pred)),
+            "accuracy": float(accuracy_score(y_test_decoded, y_pred_decoded)),
+            "weighted_f1": float(f1_score(y_test_decoded, y_pred_decoded, average="weighted")),
+            "macro_f1": float(f1_score(y_test_decoded, y_pred_decoded, average="macro")),
+            "cohen_kappa": float(cohen_kappa_score(y_test_decoded, y_pred_decoded)),
             "classification_report": classification_report(
-                y_test, y_pred,
-                target_names=["On-Time", "At Risk", "Delayed"],
+                y_test_decoded,
+                y_pred_decoded,
+                labels=present_classes.tolist(),
+                target_names=target_names,
                 output_dict=True,
             ),
-            "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
+            "confusion_matrix": confusion_matrix(
+                y_test_decoded, y_pred_decoded, labels=present_classes.tolist()
+            ).tolist(),
         }
 
         # ROC-AUC (needs probability scores)
@@ -432,12 +479,15 @@ class ModelTrainer:
 
         try:
             X_train = train_array[:, :-1]
-            y_train = train_array[:, -1].astype(int)
+            y_train_raw = train_array[:, -1].astype(int)
             X_test = test_array[:, :-1]
-            y_test = test_array[:, -1].astype(int)
+            y_test_raw = test_array[:, -1].astype(int)
+
+            y_train, y_test = self._encode_labels(y_train_raw, y_test_raw)
 
             logger.info(f"X_train: {X_train.shape}, y_train: {y_train.shape}")
             logger.info(f"X_test: {X_test.shape}, y_test: {y_test.shape}")
+            logger.info(f"Label mapping: {self.label_mapping}")
 
             models = self._build_models()
             params = self._build_params()

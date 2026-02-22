@@ -1,0 +1,91 @@
+{
+    "best_model": "CatBoost",
+    "best_weighted_f1": 1.0,
+    "model_comparison": {
+        "CatBoost": {
+            "accuracy": 1.0,
+            "weighted_f1": 1.0,
+            "macro_f1": 1.0,
+            "cohen_kappa": 1.0,
+            "roc_auc_weighted": null
+        },
+        "XGBoost": {
+            "accuracy": 1.0,
+            "weighted_f1": 1.0,
+            "macro_f1": 1.0,
+            "cohen_kappa": 1.0,
+            "roc_auc_weighted": null
+        },
+        "Random Forest": {
+            "accuracy": 1.0,
+            "weighted_f1": 1.0,
+            "macro_f1": 1.0,
+            "cohen_kappa": 1.0,
+            "roc_auc_weighted": null
+        },
+        "LightGBM": {
+            "accuracy": 1.0,
+            "weighted_f1": 1.0,
+            "macro_f1": 1.0,
+            "cohen_kappa": 1.0,
+            "roc_auc_weighted": null
+        },
+        "GNN": {
+            "accuracy": 0.485929536893419,
+            "weighted_f1": 0.38969596759656855,
+            "macro_f1": 0.424121833937123,
+            "cohen_kappa": 0.10817914460887346,
+            "roc_auc_weighted": null
+        }
+    },
+    "best_model_full_report": {
+        "model_name": "CatBoost",
+        "accuracy": 1.0,
+        "weighted_f1": 1.0,
+        "macro_f1": 1.0,
+        "cohen_kappa": 1.0,
+        "classification_report": {
+            "On-Time": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 14758.0
+            },
+            "Delayed": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 21346.0
+            },
+            "accuracy": 1.0,
+            "macro avg": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 36104.0
+            },
+            "weighted avg": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 36104.0
+            }
+        },
+        "confusion_matrix": [
+            [
+                14758,
+                0
+            ],
+            [
+                0,
+                21346
+            ]
+        ],
+        "roc_auc_weighted": null,
+        "best_params": {
+            "depth": 6,
+            "iterations": 200,
+            "learning_rate": 0.05
+        }
+    }
+}
