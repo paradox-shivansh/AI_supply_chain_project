@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from sklearn.model_selection import train_test_split
 
 # Add project root to path
@@ -14,9 +14,17 @@ from exception import CustomException
 
 @dataclass
 class DataIngestionConfig:
-    raw_data_path: str = os.path.join("artifacts", "raw.csv")
-    train_data_path: str = os.path.join("artifacts", "train.csv")
-    test_data_path: str = os.path.join("artifacts", "test.csv")
+    artifacts_dir: str = os.path.join(os.getcwd(), "artifacts")
+    raw_data_path: str = field(init=False)
+    train_data_path: str = field(init=False)
+    test_data_path: str = field(init=False)
+
+    def __post_init__(self):
+        self.raw_data_path   = os.path.join(self.artifacts_dir, "raw.csv")
+        self.train_data_path = os.path.join(self.artifacts_dir, "train.csv")
+        self.test_data_path  = os.path.join(self.artifacts_dir, "test.csv")
+        # Ensure artifacts directory always exists at config creation time
+        os.makedirs(self.artifacts_dir, exist_ok=True)
 
 
 class DataIngestion:
@@ -52,9 +60,9 @@ class DataIngestion:
         """
         logger.info("Engineering target variable: Delay_Risk_Level")
 
-        real_col = "Days for shipping (real)"
-        sched_col = "Days for shipment (scheduled)"
-        late_risk_col = "Late_delivery_risk"
+        real_col          = "Days for shipping (real)"
+        sched_col         = "Days for shipment (scheduled)"
+        late_risk_col     = "Late_delivery_risk"
         delivery_status_col = "Delivery Status"
 
         delay_gap = df[real_col] - df[sched_col]
@@ -79,11 +87,9 @@ class DataIngestion:
         # Assign: default to Delayed, then override with better matches
         df["Delay_Risk_Level"] = 2  # Default: Delayed
 
-        # Apply in order of specificity
-        df.loc[conditions_at_risk, "Delay_Risk_Level"] = 1
-        df.loc[conditions_on_time, "Delay_Risk_Level"] = 0
-        # Delayed overrides at_risk if truly delayed
-        df.loc[conditions_delayed, "Delay_Risk_Level"] = 2
+        df.loc[conditions_at_risk,  "Delay_Risk_Level"] = 1
+        df.loc[conditions_on_time,  "Delay_Risk_Level"] = 0
+        df.loc[conditions_delayed,  "Delay_Risk_Level"] = 2
 
         class_dist = df["Delay_Risk_Level"].value_counts()
         logger.info(f"Target class distribution:\n{class_dist}")
@@ -93,17 +99,14 @@ class DataIngestion:
         """Drop irrelevant columns and handle obvious data quality issues."""
         logger.info(f"Original shape: {df.shape}")
 
-        # Drop irrelevant columns (only those that exist)
         cols_to_drop = [c for c in self.COLUMNS_TO_DROP if c in df.columns]
         df = df.drop(columns=cols_to_drop, errors="ignore")
         logger.info(f"Dropped {len(cols_to_drop)} irrelevant columns")
 
-        # Drop duplicates
         before = len(df)
         df = df.drop_duplicates()
         logger.info(f"Removed {before - len(df)} duplicate rows")
 
-        # Drop rows where critical columns are null
         critical_cols = ["Days for shipping (real)", "Days for shipment (scheduled)"]
         critical_cols = [c for c in critical_cols if c in df.columns]
         df = df.dropna(subset=critical_cols)
@@ -137,8 +140,10 @@ class DataIngestion:
             # Engineer target
             df = self._engineer_target(df)
 
+            # Guarantee artifacts dir exists before every write (belt + suspenders)
+            os.makedirs(self.ingestion_config.artifacts_dir, exist_ok=True)
+
             # Save raw data
-            os.makedirs(os.path.dirname(self.ingestion_config.raw_data_path), exist_ok=True)
             df.to_csv(self.ingestion_config.raw_data_path, index=False)
             logger.info(f"Raw data saved at: {self.ingestion_config.raw_data_path}")
 
@@ -150,13 +155,14 @@ class DataIngestion:
                 stratify=df["Delay_Risk_Level"],
             )
 
+            # Save train and test sets
             train_set.to_csv(self.ingestion_config.train_data_path, index=False)
             test_set.to_csv(self.ingestion_config.test_data_path, index=False)
 
             logger.info(f"Train set shape: {train_set.shape}")
-            logger.info(f"Test set shape: {test_set.shape}")
+            logger.info(f"Test set shape:  {test_set.shape}")
             logger.info(f"Train data saved at: {self.ingestion_config.train_data_path}")
-            logger.info(f"Test data saved at: {self.ingestion_config.test_data_path}")
+            logger.info(f"Test data saved at:  {self.ingestion_config.test_data_path}")
             logger.info("DATA INGESTION COMPLETED")
 
             return (
