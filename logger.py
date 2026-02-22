@@ -11,25 +11,25 @@ os.makedirs(logs_path, exist_ok=True)
 
 LOG_FILE_PATH = os.path.join(logs_path, LOG_FILE)
 
-logging.basicConfig(
-    filename=LOG_FILE_PATH,
-    format="[ %(asctime)s ] %(lineno)d %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+# Log format
+LOG_FORMAT = "[ %(asctime)s ] %(lineno)d %(name)s - %(levelname)s - %(message)s"
 
-# Also log to console
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(
-    logging.Formatter("[ %(asctime)s ] %(lineno)d %(name)s - %(levelname)s - %(message)s")
-)
-
+# Create logger
 logger = logging.getLogger("SupplyChainAI")
 logger.setLevel(logging.INFO)
+logger.propagate = False  # Prevent propagation to root logger to avoid duplicates
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+
+# File handler
+file_handler = logging.FileHandler(LOG_FILE_PATH)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+
+# Add handlers only if not already present
 if not logger.handlers:
     logger.addHandler(console_handler)
-    file_handler = logging.FileHandler(LOG_FILE_PATH)
-    file_handler.setFormatter(
-        logging.Formatter("[ %(asctime)s ] %(lineno)d %(name)s - %(levelname)s - %(message)s")
-    )
     logger.addHandler(file_handler)

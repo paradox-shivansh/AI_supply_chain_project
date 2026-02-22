@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
 
 # Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from logger import logger
 from exception import CustomException
@@ -170,5 +170,7 @@ class DataIngestion:
 
 if __name__ == "__main__":
     obj = DataIngestion()
-    train_path, test_path = obj.initiate_data_ingestion("data/supply_chain_data.csv")
+    train_path, test_path = obj.initiate_data_ingestion(
+        r"D:\AI_supply_chain_project\DataCoSupplyChainDataset.csv\DataCoSupplyChainDataset.csv"
+    )
     print(f"Train: {train_path}, Test: {test_path}")
