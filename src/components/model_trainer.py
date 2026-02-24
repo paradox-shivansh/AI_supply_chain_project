@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from logger import logger
 from exception import CustomException
-from utils import save_object, load_object, evaluate_models, save_json, get_feature_importance
+from utils import save_object, load_object, evaluate_models, save_json, get_feature_importance, apply_probability_constraints
 
 # Optional imports with graceful fallback
 try:
@@ -312,11 +312,13 @@ class ModelTrainer:
             )
 
         if HAS_XGBOOST:
+            # Note: early_stopping_rounds removed for cross-validation compatibility
+            # Will be applied only during final training if needed
             models["XGBoost"] = XGBClassifier(
-                use_label_encoder=False,
                 eval_metric="mlogloss",
                 random_state=42,
                 n_jobs=-1,
+                tree_method="hist",  # Faster tree method
             )
 
         models["Random Forest"] = RandomForestClassifier(
@@ -341,34 +343,68 @@ class ModelTrainer:
         return models
 
     def _build_params(self) -> Dict:
+        """
+        Build comprehensive hyperparameter grids with regularization to prevent overfitting.
+        Includes learning rate tuning, regularization, and tree depth constraints.
+        Note: early_stopping_rounds excluded from grid search (incompatible with CV)
+        """
         params = {}
 
         if HAS_CATBOOST:
+            # CatBoost hyperparameters with anti-overfitting measures
             params["CatBoost"] = {
-                "iterations": [200, 300],
-                "learning_rate": [0.05, 0.1],
-                "depth": [6, 8],
+                "iterations": [100, 200, 300, 400],
+                "learning_rate": [0.01, 0.05, 0.1, 0.15],
+                "depth": [4, 6, 8, 10],
+                "l2_leaf_reg": [1, 3, 5, 7, 10],  # Regularization parameter
+                "subsample": [0.7, 0.8, 0.9, 1.0],  # Prevent overfitting
+                "colsample_bylevel": [0.7, 0.8, 0.9],  # Column sampling
+                "random_strength": [0.0, 0.01, 0.1],  # Random noise in splits
             }
 
         if HAS_XGBOOST:
+            # XGBoost hyperparameters with comprehensive regularization
+            # Note: removed early_stopping_rounds (requires validation set in CV)
             params["XGBoost"] = {
-                "n_estimators": [200, 300],
-                "max_depth": [6, 8],
-                "learning_rate": [0.05, 0.1],
-                "subsample": [0.8, 1.0],
+                "n_estimators": [100, 200, 300, 400],
+                "max_depth": [3, 5, 7, 9],  # Shallow trees reduce overfitting
+                "learning_rate": [0.01, 0.05, 0.1, 0.15],
+                "subsample": [0.6, 0.7, 0.8, 0.9],  # Stochastic tree building
+                "colsample_bytree": [0.6, 0.7, 0.8, 0.9],  # Feature sampling
+                "colsample_bylevel": [0.6, 0.7, 0.8, 0.9],  # Level feature sampling
+                "reg_alpha": [0, 0.1, 0.5, 1.0],  # L1 regularization
+                "reg_lambda": [0.5, 1.0, 1.5, 2.0],  # L2 regularization
+                "min_child_weight": [1, 3, 5, 7],  # Min samples per leaf
+                "gamma": [0, 0.1, 0.5, 1],  # Min loss reduction for split
             }
 
+        # Random Forest with regularization
         params["Random Forest"] = {
-            "n_estimators": [100, 200],
-            "max_depth": [None, 20],
-            "min_samples_split": [2, 5],
+            "n_estimators": [100, 200, 300, 400],
+            "max_depth": [5, 10, 15, 20, None],
+            "min_samples_split": [2, 5, 10, 15],  # Anti-overfitting
+            "min_samples_leaf": [1, 2, 4, 8],  # Min samples in leaf
+            "max_features": ["sqrt", "log2"],  # Feature sampling
+            "max_samples": [0.7, 0.8, 0.9, 1.0],  # Bootstrap sample ratio
+            "class_weight": ["balanced"],  # Handle class imbalance
         }
 
         if HAS_LIGHTGBM:
+            # LightGBM hyperparameters with anti-overfitting measures
             params["LightGBM"] = {
-                "n_estimators": [200, 300],
-                "learning_rate": [0.05, 0.1],
-                "num_leaves": [31, 63],
+                "n_estimators": [100, 200, 300, 400],
+                "learning_rate": [0.01, 0.05, 0.1, 0.15],
+                "num_leaves": [20, 31, 50, 63],  # More leaves = more capacity
+                "max_depth": [5, 10, 15, 20],  # Tree depth constraint
+                "subsample": [0.6, 0.7, 0.8, 0.9],  # Row sampling
+                "colsample_bytree": [0.6, 0.7, 0.8, 0.9],  # Feature sampling
+                "reg_alpha": [0, 0.1, 0.5, 1.0],  # L1 regularization
+                "reg_lambda": [0.5, 1.0, 1.5, 2.0],  # L2 regularization
+                "min_child_weight": [1, 5, 10, 15],  # Min sum of hessian
+                "min_child_samples": [5, 10, 20, 40],  # Min samples per leaf
+                "feature_fraction_seed": [0],  # Fix feature sampling seed
+                "bagging_fraction": [0.7, 0.8, 0.9, 1.0],  # Bagging sample ratio
+                "bagging_freq": [1, 5, 10],  # Bagging frequency
             }
 
         # GNN has no sklearn-compatible grid search
@@ -412,8 +448,18 @@ class ModelTrainer:
     def _compute_full_metrics(
         self, model: Any, X_test: np.ndarray, y_test: np.ndarray, model_name: str
     ) -> Dict:
-        """Compute comprehensive evaluation metrics."""
+        """Compute comprehensive evaluation metrics with probability constraints applied."""
+        # Get predictions
         y_pred_encoded = model.predict(X_test)
+        
+        # Apply probability constraints if model has predict_proba
+        if hasattr(model, "predict_proba"):
+            y_proba = model.predict_proba(X_test)
+            # Apply constraints: 98% max for On-Time/Delayed, 2% min for At Risk
+            constrained_proba = apply_probability_constraints(y_proba)
+            # Update predictions based on constrained probabilities
+            y_pred_encoded = np.argmax(constrained_proba, axis=1)
+        
         y_test_decoded = self._decode_labels(y_test)
         y_pred_decoded = self._decode_labels(y_pred_encoded)
 
@@ -444,7 +490,9 @@ class ModelTrainer:
         try:
             if hasattr(model, "predict_proba"):
                 y_proba = model.predict_proba(X_test)
-                roc_auc = roc_auc_score(y_test, y_proba, multi_class="ovr", average="weighted")
+                # Use constrained probabilities for ROC-AUC
+                constrained_proba = apply_probability_constraints(y_proba)
+                roc_auc = roc_auc_score(y_test, constrained_proba, multi_class="ovr", average="weighted")
                 metrics["roc_auc_weighted"] = float(roc_auc)
         except Exception as e:
             logger.warning(f"ROC-AUC computation failed for {model_name}: {e}")
@@ -497,7 +545,9 @@ class ModelTrainer:
 
             logger.info(f"Models to train: {list(models.keys())}")
 
-            # ── Train all models ───────────────────────────────────────────
+            # ── Train all models with comprehensive hyperparameter tuning ────
+            logger.info("Starting model training with hyperparameter optimization...")
+            logger.info("Using RandomizedSearchCV for efficient parameter exploration")
             model_report = evaluate_models(
                 X_train=X_train,
                 y_train=y_train,
@@ -505,6 +555,8 @@ class ModelTrainer:
                 y_test=y_test,
                 models=models,
                 params=params,
+                use_random_search=True,  # Use RandomizedSearchCV for efficiency
+                n_iter=30,  # Number of parameter combinations to try
             )
 
             # ── Find best model by weighted F1 ─────────────────────────────
@@ -533,6 +585,7 @@ class ModelTrainer:
                     info["model"], X_test, y_test, name
                 )
                 all_metrics[name]["best_params"] = info.get("best_params", {})
+                all_metrics[name]["cv_macro_f1"] = info.get("macro_f1", 0)  # Cross-validation macro F1
 
             # ── Feature importance ─────────────────────────────────────────
             try:

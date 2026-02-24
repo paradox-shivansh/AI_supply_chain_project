@@ -31,10 +31,10 @@
             "roc_auc_weighted": null
         },
         "GNN": {
-            "accuracy": 0.485929536893419,
-            "weighted_f1": 0.38969596759656855,
-            "macro_f1": 0.424121833937123,
-            "cohen_kappa": 0.10817914460887346,
+            "accuracy": 0.4855140704631066,
+            "weighted_f1": 0.38912605308945497,
+            "macro_f1": 0.4235978113250349,
+            "cohen_kappa": 0.10749751129244256,
             "roc_auc_weighted": null
         }
     },
@@ -83,9 +83,14 @@
         ],
         "roc_auc_weighted": null,
         "best_params": {
-            "depth": 6,
-            "iterations": 200,
-            "learning_rate": 0.05
-        }
+            "subsample": 0.9,
+            "random_strength": 0.1,
+            "learning_rate": 0.05,
+            "l2_leaf_reg": 3,
+            "iterations": 300,
+            "depth": 10,
+            "colsample_bylevel": 0.8
+        },
+        "cv_macro_f1": 1.0
     }
 }

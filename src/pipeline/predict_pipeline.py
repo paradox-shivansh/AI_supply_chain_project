@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from logger import logger
 from exception import CustomException
-from utils import load_json, load_object
+from utils import load_json, load_object, apply_probability_constraints
 
 
 # Label mapping
@@ -161,20 +161,31 @@ class PredictPipeline:
             num_encoded_classes = len(self._inverse_label_mapping)
             if hasattr(self._model, "predict_proba"):
                 encoded_proba = self._model.predict_proba(X_transformed)[0]
-                if encoded_proba.shape[0] < num_encoded_classes:
-                    pad_width = num_encoded_classes - encoded_proba.shape[0]
+                # Pad if we have fewer predictions than expected classes
+                if len(encoded_proba) < num_encoded_classes:
+                    pad_width = num_encoded_classes - len(encoded_proba)
                     encoded_proba = np.pad(encoded_proba, (0, pad_width), constant_values=0.0)
             else:
                 encoded_proba = np.zeros(num_encoded_classes, dtype=float)
+            
+            # Apply probability constraints only if we have 3 classes (98% max for On-Time/Delayed, 2% min for At Risk)
+            encoded_proba_reshaped = encoded_proba.reshape(1, -1)
+            constrained_proba = apply_probability_constraints(encoded_proba_reshaped)[0]
+            
+            # Update prediction based on constrained probabilities
+            encoded_pred = int(np.argmax(constrained_proba))
+            decoded_pred = self._decode_label(encoded_pred)
+            pred_label = LABEL_MAP.get(decoded_pred, f"Class {decoded_pred}")
+            
             confidence = float(
-                encoded_proba[encoded_pred] if encoded_pred < len(encoded_proba) else 0.0
+                constrained_proba[encoded_pred] if encoded_pred < len(constrained_proba) else 0.0
             )
 
             probabilities = {}
             for cls_code, label_name in LABEL_MAP.items():
                 encoded_idx = self._encoded_index(cls_code)
-                if encoded_idx is not None and encoded_idx < len(encoded_proba):
-                    prob = encoded_proba[encoded_idx]
+                if encoded_idx is not None and encoded_idx < len(constrained_proba):
+                    prob = constrained_proba[encoded_idx]
                 else:
                     prob = 0.0
                 probabilities[label_name] = round(float(prob) * 100, 2)
